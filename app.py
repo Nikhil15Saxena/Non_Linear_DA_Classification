@@ -77,7 +77,7 @@ def main():
 
             # Factor Analysis
             n_factors = st.number_input("Enter the number of factors:", min_value=1, max_value=df2.shape[1], value=6)
-            fa = FactorAnalyzer(n_factors=n_factors, method='principal', rotation="Quartimax")
+            fa = FactorAnalyzer(n_factors=n_factors, method='principal', rotation="Varimax")
             fa.fit(df2)
             fa_df = pd.DataFrame(fa.loadings_.round(2), index=df2.columns)
             st.write("Factor Loadings:")
