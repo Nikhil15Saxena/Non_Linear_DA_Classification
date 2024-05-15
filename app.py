@@ -143,6 +143,15 @@ def main():
             plt.legend(loc="lower right")
             st.pyplot(plt)
 
+            # About section
+            st.sidebar.title("About")
+            st.sidebar.info(
+                """
+                This app was created by Nikhil Saxena for LMRI team use.
+                Contact: Nikhil.Saxena@lilly.com
+                """
+            )
+
 if __name__ == "__main__":
     main()
 
