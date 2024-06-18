@@ -7,16 +7,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from factor_analyzer import FactorAnalyzer
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity, calculate_kmo
-from xgboost import XGBClassifier, plot_tree as xgb_plot_tree
 from sklearn.tree import export_graphviz
 import pydotplus
 from io import StringIO
+import graphviz
 
 # CSS to hide Streamlit menu and footer
 hide_streamlit_style = """
@@ -62,6 +63,19 @@ def main():
             ---
             """, unsafe_allow_html=True)
     
+# Streamlit app
+def main():
+    st.title("Non-Linear Classification Analysis Model_V2")
+
+    # Enhanced About section
+    st.sidebar.title("About")
+    st.sidebar.markdown("""
+            ### About this App
+            This app allows for comprehensive data analysis, including filtering, factor analysis, and classification using various models.
+                
+            ---
+            """)
+
     st.header("Upload your dataset")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
@@ -181,72 +195,127 @@ def main():
             st.write("Factor Scores:")
             st.write(factor_scores)
 
-            st.header("Model Training and Evaluation")
+            # Models
+            models = {
+                'Random Forest': RandomForestClassifier(random_state=42),
+                'Gradient Boosting Machine': GradientBoostingClassifier(random_state=42),
+                'XGBoost': XGBClassifier(random_state=42)
+            }
 
-            # Random Forest
-            st.subheader("Random Forest")
-            rf_classifier = RandomForestClassifier(random_state=42)
-            X_train, X_test, y_train, y_test = train_test_split(factor_scores, y, train_size=0.7, random_state=42)
-            rf_classifier.fit(X_train, y_train)
-            y_train_pred_rf = rf_classifier.predict(X_train)
-            y_test_pred_rf = rf_classifier.predict(X_test)
+            model_names = st.multiselect("Select models to use:", list(models.keys()), default=['Random Forest'])
 
-            st.write("Random Forest - Classification Report (Test Data):")
-            st.text(classification_report(y_test, y_test_pred_rf))
+            for model_name in model_names:
+                st.subheader(f"{model_name} Classifier")
 
-            # Feature Importance
-            imp_df_rf = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
-            imp_df_rf.sort_values(by="Imp", ascending=False, inplace=True)
-            st.write("Random Forest - Feature Importance:")
-            st.write(imp_df_rf)
+                X = factor_scores
+                X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
 
-            # Gradient Boosting Machine
-            st.subheader("Gradient Boosting Machine")
-            gbm_classifier = GradientBoostingClassifier(random_state=42)
-            gbm_classifier.fit(X_train, y_train)
-            y_train_pred_gbm = gbm_classifier.predict(X_train)
-            y_test_pred_gbm = gbm_classifier.predict(X_test)
+                # Default hyperparameters
+                if model_name == 'Random Forest':
+                    max_depth = 3
+                    max_features = 3
+                    n_estimators = 500
+                elif model_name == 'Gradient Boosting Machine':
+                    max_depth = 3
+                    learning_rate = 0.1
+                    n_estimators = 100
+                elif model_name == 'XGBoost':
+                    max_depth = 3
+                    learning_rate = 0.1
+                    n_estimators = 100
 
-            st.write("Gradient Boosting Machine - Classification Report (Test Data):")
-            st.text(classification_report(y_test, y_test_pred_gbm))
+                # Toggle for GridSearchCV
+                if st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning"):
+                    if model_name == 'Random Forest':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10))
+                        max_features_range = st.slider("Select max_features range", 1, X.shape[1], (1, 5))
+                        # Adjust the step parameter for n_estimators slider to ensure a difference of 500
+                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=500)
 
-            # Feature Importance
-            imp_df_gbm = pd.DataFrame({"varname": X_train.columns, "Imp": gbm_classifier.feature_importances_ * 100})
-            imp_df_gbm.sort_values(by="Imp", ascending=False, inplace=True)
-            st.write("Gradient Boosting Machine - Feature Importance:")
-            st.write(imp_df_gbm)
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 500))
+                        }
+                    elif model_name == 'Gradient Boosting Machine':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10))
+                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), step=0.1)
+                        n_estimators_range = st.slider("Select n_estimators range", 50, 1000, (100, 500), step=100)
 
-            # XGBoost
-            st.subheader("XGBoost")
-            xgb_classifier = XGBClassifier(random_state=42)
-            xgb_classifier.fit(X_train, y_train)
-            y_train_pred_xgb = xgb_classifier.predict(X_train)
-            y_test_pred_xgb = xgb_classifier.predict(X_test)
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.1).tolist(),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
+                        }
+                    elif model_name == 'XGBoost':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10))
+                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), step=0.1)
+                        n_estimators_range = st.slider("Select n_estimators range", 50, 1000, (100, 500), step=100)
 
-            st.write("XGBoost - Classification Report (Test Data):")
-            st.text(classification_report(y_test, y_test_pred_xgb))
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.1).tolist(),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
+                        }
 
-            # Feature Importance
-            imp_df_xgb = pd.DataFrame({"varname": X_train.columns, "Imp": xgb_classifier.feature_importances_ * 100})
-            imp_df_xgb.sort_values(by="Imp", ascending=False, inplace=True)
-            st.write("XGBoost - Feature Importance:")
-            st.write(imp_df_xgb)
+                    clf = GridSearchCV(models[model_name], param_grid, cv=5, n_jobs=-1)
+                    clf.fit(X_train, y_train)
 
-            # Button to display Random Forest Trees
-            if st.button("Show Random Forest Trees"):
-                estimator = rf_classifier.estimators_[0]
-                dot_data = StringIO()
-                export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
-                                special_characters=True, feature_names=X_train.columns, class_names=rf_classifier.classes_.astype(str))
-                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-                st.graphviz_chart(graph.to_string())
+                    st.write(f"Best Parameters for {model_name}:")
+                    st.write(clf.best_params_)
+                    st.write(f"Best Score for {model_name}:")
+                    st.write(clf.best_score_)
 
-            # Button to display XGBoost Trees
-            if st.button("Show XGBoost Trees"):
-                estimator = xgb_classifier.get_booster()
-                dot_data = StringIO()
-                xgb_plot_tree(estimator, num_trees=0, ax=None, rankdir='UT')
-                st.pyplot(plt)
+                    # Update default hyperparameters
+                    max_depth = clf.best_params_['max_depth']
+                    if model_name == 'Random Forest':
+                        max_features = clf.best_params_['max_features']
+                    elif model_name in ['Gradient Boosting Machine', 'XGBoost']:
+                        learning_rate = clf.best_params_['learning_rate']
+                    n_estimators = clf.best_params_['n_estimators']
 
+                # Manual hyperparameter input
+                if st.checkbox(f"Manually input hyperparameters for {model_name}"):
+                    if model_name == 'Random Forest':
+                        max_depth = st.number_input("Enter max_depth:", 1, 20, 3, 1)
+                        max_features = st.number_input("Enter max_features:", 1, X.shape[1], 3, 1)
+                        n_estimators = st.number_input("Enter n_estimators:", 100, 1000, 500, 100)
+                    elif model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
+                        max_depth = st.number_input("Enter max_depth:", 1, 20, 3, 1)
+                        learning_rate = st.number_input("Enter learning_rate:", 0.01, 1.0, 0.1, 0.1)
+                        n_estimators = st.number_input("Enter n_estimators:", 50, 1000, 100, 100)
+
+                # Model training and evaluation
+                model = models[model_name]
+                if model_name == 'Random Forest':
+                    model.set_params(max_depth=max_depth, max_features=max_features, n_estimators=n_estimators)
+                elif model_name == 'Gradient Boosting Machine':
+                    model.set_params(max_depth=max_depth, learning_rate=learning_rate, n_estimators=n_estimators)
+                elif model_name == 'XGBoost':
+                    model.set_params(max_depth=max_depth, learning_rate=learning_rate, n_estimators=n_estimators, objective='binary:logistic')
+
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                acc = accuracy_score(y_test, y_pred)
+                st.write(f"Accuracy for {model_name}:")
+                st.write(acc)
+
+                st.subheader(f"Confusion Matrix for {model_name}:")
+                cm = confusion_matrix(y_test, y_pred)
+                st.write(cm)
+
+                st.subheader(f"Classification Report for {model_name}:")
+                report = classification_report(y_test, y_pred)
+                st.write(report)
+
+                # Visualization of decision trees
+                if st.button(f"Show {model_name} Trees"):
+                    for estimator in model.estimators_:
+                        dot_data = StringIO()
+                        export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True, special_characters=True, feature_names=X.columns)
+                        graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                        st.graphviz_chart(graph.create_png())
+
+# Run the Streamlit app
 if __name__ == "__main__":
     main()
