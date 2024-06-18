@@ -183,7 +183,7 @@ def main():
             models = ['Random Forest', 'Gradient Boosting Machine', 'XGBoost']
             selected_models = st.multiselect("Select models to train and evaluate:", models, default=models)
 
-            for model_name in selected_models:
+ for model_name in selected_models:
     st.subheader(f"{model_name} Classifier")
 
     # Default hyperparameters
