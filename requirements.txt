@@ -6,3 +6,6 @@ seaborn
 scikit-learn
 factor_analyzer
 statsmodels
+pydotplus
+graphviz
+xgboost
