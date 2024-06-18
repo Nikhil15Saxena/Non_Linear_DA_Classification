@@ -1,16 +1,22 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
 from sklearn.model_selection import train_test_split, GridSearchCV
 from factor_analyzer import FactorAnalyzer
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity, calculate_kmo
+from sklearn.tree import export_graphviz
+import pydotplus
+from io import StringIO
+import graphviz
 
 # CSS to inject contained in a string
 hide_streamlit_style = """
@@ -42,7 +48,7 @@ def main():
     st.sidebar.title("About")
     st.sidebar.markdown("""
             ### About this App
-            This app was created by Nikhil Saxena for LMRI team use. It allows for comprehensive data analysis, including filtering, factor analysis, and classification using Random Forest, GBM, and XGBoost models.
+            This app was created by Nikhil Saxena for LMRI team use. It allows for comprehensive data analysis, including filtering, factor analysis, and random forest classification. 
                 
             **Contact:** 
             - Email: [Nikhil.Saxena@lilly.com](mailto:Nikhil.Saxena@lilly.com)
@@ -50,8 +56,8 @@ def main():
             **Features:**
             - Upload and filter datasets
             - Perform factor analysis with customizable settings
-            - Train and evaluate Random Forest, GBM, and XGBoost classifiers with optional hyperparameter tuning
-            - Visualize results with feature importance
+            - Train and evaluate a Random Forest classifier with optional hyperparameter tuning
+            - Visualize results with ROC curves and feature importance
                 
             ---
             """, unsafe_allow_html=True)
@@ -175,199 +181,103 @@ def main():
             st.write("Factor Scores:")
             st.write(factor_scores)
 
-            # Classification Models
+            # Random Forest Classifier
             X = factor_scores
             X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
 
-            # Random Forest Classifier
-            st.subheader("Random Forest Classifier")
-
-            # Hyperparameters for GridSearchCV
-            rf_param_grid = {
-                'n_estimators': [100, 300, 500],
-                'max_depth': [3, 5, 10, None],
-                'max_features': ['auto', 'sqrt', 'log2'],
-                'criterion': ['gini', 'entropy']
+            # Default hyperparameters
+            default_params = {
+                'max_depth': 3,
+                'max_features': 3,
+                'n_estimators': 500
             }
-
-            # Option to manually enter hyperparameters
-            if st.checkbox("Manually Enter Random Forest Hyperparameters"):
-                rf_manual_params = {}
-                rf_manual_params['n_estimators'] = st.number_input("Enter n_estimators:", min_value=1, value=100, step=1)
-                rf_manual_params['max_depth'] = st.selectbox("Select max_depth:", [3, 5, 10, None])
-                rf_manual_params['max_features'] = st.selectbox("Select max_features:", ['auto', 'sqrt', 'log2'])
-                rf_manual_params['criterion'] = st.selectbox("Select criterion:", ['gini', 'entropy'])
+            
+            # Ask if the user wants to input hyperparameters manually
+            manual_params = {}
+            if st.checkbox("Manually set Random Forest parameters"):
+                manual_params['max_depth'] = st.number_input("max_depth", min_value=1, max_value=20, value=3)
+                manual_params['max_features'] = st.number_input("max_features", min_value=1, max_value=X.shape[1], value=3)
+                manual_params['n_estimators'] = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500)
             else:
-                rf_manual_params = None
+                manual_params = default_params
+            
+            # Option to use GridSearchCV
+            if st.checkbox("Use GridSearchCV for hyperparameter tuning"):
+                max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10))
+                max_features_range = st.slider("Select max_features range", 1, X.shape[1], (1, 5))
+                n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100)
 
-            if rf_manual_params:
-                st.write("Using Manual Hyperparameters for Random Forest:")
-                st.write(rf_manual_params)
+                param_grid = {
+                    'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                    'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
+                    'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
+                }
 
-            # Perform GridSearchCV if not using manual hyperparameters
-            if not rf_manual_params:
-                try:
-                    rf_grid = GridSearchCV(RandomForestClassifier(random_state=42), rf_param_grid, cv=5, n_jobs=1)
-                    rf_grid.fit(X_train, y_train)
-                    rf_best_params = rf_grid.best_params_
-                except Exception as e:
-                    st.error(f"Error during GridSearchCV: {e}")
-                    rf_best_params = rf_param_grid
+                rf = RandomForestClassifier(random_state=42)
+                grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, n_jobs=1, verbose=2)
+                grid_search.fit(X_train, y_train)
+                best_params = grid_search.best_params_
+                st.write("Best Hyperparameters found by GridSearchCV:")
+                st.write(best_params)
+                final_params = best_params
             else:
-                rf_best_params = rf_manual_params
+                final_params = manual_params
+            
+            st.write("Current Hyperparameters used:")
+            st.write(final_params)
 
-            st.write("Best Parameters for Random Forest:")
-            st.write(rf_best_params)
-
-            # Train and test with best parameters
-            rf_classifier = RandomForestClassifier(random_state=42, **rf_best_params)
+            rf_classifier = RandomForestClassifier(random_state=42, **final_params)
             rf_classifier.fit(X_train, y_train)
-            y_train_pred_rf = rf_classifier.predict(X_train)
-            y_test_pred_rf = rf_classifier.predict(X_test)
+            y_train_pred = rf_classifier.predict(X_train)
+            y_test_pred = rf_classifier.predict(X_test)
 
-            st.write("Train Data Classification Report for Random Forest:")
-            st.write(classification_report(y_train, y_train_pred_rf))
+            # Metrics
+            cf_train = confusion_matrix(y_train, y_train_pred)
+            cf_test = confusion_matrix(y_test, y_test_pred)
+            TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
+            TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
 
-            st.write("Test Data Classification Report for Random Forest:")
-            st.write(classification_report(y_test, y_test_pred_rf))
+            st.write("Train Data Metrics:")
+            st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
+            st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
+            st.write(f"Specificity: {TN_train / (TN_train + FP_train)}")
 
-            st.subheader("Feature Importance for Random Forest")
-            feature_imp_rf = pd.Series(rf_classifier.feature_importances_, index=X.columns).sort_values(ascending=False)
-            st.write(feature_imp_rf)
-            plt.figure(figsize=(10, 6))
-            sns.barplot(x=feature_imp_rf, y=feature_imp_rf.index)
-            plt.xlabel('Feature Importance Score')
-            plt.ylabel('Features')
-            plt.title("Visualizing Important Features for Random Forest")
-            st.pyplot(plt)
+            st.write("Test Data Metrics:")
+            st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
+            st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
+            st.write(f"Specificity: {TN_test / (TN_test + FP_test)}")
 
-            # Gradient Boosting Classifier
-            st.subheader("Gradient Boosting Classifier")
+            st.write("Classification Report:")
+            st.text(classification_report(y_test, y_test_pred))
 
-            # Hyperparameters for GridSearchCV
-            gb_param_grid = {
-                'n_estimators': [100, 300, 500],
-                'learning_rate': [0.01, 0.1, 0.5],
-                'max_depth': [3, 5, 10],
-                'subsample': [0.8, 1.0],
-                'max_features': ['auto', 'sqrt', 'log2']
-            }
+            # Feature Importance
+            imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
+            imp_df.sort_values(by="Imp", ascending=False, inplace=True)
+            st.write("Feature Importance:")
+            st.write(imp_df)
 
-            # Option to manually enter hyperparameters
-            if st.checkbox("Manually Enter Gradient Boosting Hyperparameters"):
-                gb_manual_params = {}
-                gb_manual_params['n_estimators'] = st.number_input("Enter n_estimators:", min_value=1, value=100, step=1)
-                gb_manual_params['learning_rate'] = st.selectbox("Select learning_rate:", [0.01, 0.1, 0.5])
-                gb_manual_params['max_depth'] = st.selectbox("Select max_depth:", [3, 5, 10])
-                gb_manual_params['subsample'] = st.selectbox("Select subsample:", [0.8, 1.0])
-                gb_manual_params['max_features'] = st.selectbox("Select max_features:", ['auto', 'sqrt', 'log2'])
-            else:
-                gb_manual_params = None
+            # Button to display ROC Curve
+            if st.button("Show ROC Curve"):
+                fpr, tpr, _ = roc_curve(y_test, rf_classifier.predict_proba(X_test)[:, 1])
+                roc_auc = auc(fpr, tpr)
+                plt.figure(figsize=(10, 6))
+                plt.plot(fpr, tpr, color='blue', label=f'ROC curve (area = {roc_auc:.2f})')
+                plt.plot([0, 1], [0, 1], color='red', linestyle='--')
+                plt.xlabel('False Positive Rate')
+                plt.ylabel('True Positive Rate')
+                plt.title('Receiver Operating Characteristic (ROC) Curve')
+                plt.legend(loc="lower right")
+                st.pyplot(plt)
 
-            if gb_manual_params:
-                st.write("Using Manual Hyperparameters for Gradient Boosting:")
-                st.write(gb_manual_params)
-
-            # Perform GridSearchCV if not using manual hyperparameters
-            if not gb_manual_params:
-                try:
-                    gb_grid = GridSearchCV(GradientBoostingClassifier(random_state=42), gb_param_grid, cv=5, n_jobs=1)
-                    gb_grid.fit(X_train, y_train)
-                    gb_best_params = gb_grid.best_params_
-                except Exception as e:
-                    st.error(f"Error during GridSearchCV: {e}")
-                    gb_best_params = gb_param_grid
-            else:
-                gb_best_params = gb_manual_params
-
-            st.write("Best Parameters for Gradient Boosting:")
-            st.write(gb_best_params)
-
-            # Train and test with best parameters
-            gb_classifier = GradientBoostingClassifier(random_state=42, **gb_best_params)
-            gb_classifier.fit(X_train, y_train)
-            y_train_pred_gb = gb_classifier.predict(X_train)
-            y_test_pred_gb = gb_classifier.predict(X_test)
-
-            st.write("Train Data Classification Report for Gradient Boosting:")
-            st.write(classification_report(y_train, y_train_pred_gb))
-
-            st.write("Test Data Classification Report for Gradient Boosting:")
-            st.write(classification_report(y_test, y_test_pred_gb))
-
-            st.subheader("Feature Importance for Gradient Boosting")
-            feature_imp_gb = pd.Series(gb_classifier.feature_importances_, index=X.columns).sort_values(ascending=False)
-            st.write(feature_imp_gb)
-            plt.figure(figsize=(10, 6))
-            sns.barplot(x=feature_imp_gb, y=feature_imp_gb.index)
-            plt.xlabel('Feature Importance Score')
-            plt.ylabel('Features')
-            plt.title("Visualizing Important Features for Gradient Boosting")
-            st.pyplot(plt)
-
-            # XGBoost Classifier
-            st.subheader("XGBoost Classifier")
-
-            # Hyperparameters for GridSearchCV
-            xgb_param_grid = {
-                'n_estimators': [100, 300, 500],
-                'learning_rate': [0.01, 0.1, 0.5],
-                'max_depth': [3, 5, 10],
-                'subsample': [0.8, 1.0],
-                'colsample_bytree': [0.8, 1.0]
-            }
-
-            # Option to manually enter hyperparameters
-            if st.checkbox("Manually Enter XGBoost Hyperparameters"):
-                xgb_manual_params = {}
-                xgb_manual_params['n_estimators'] = st.number_input("Enter n_estimators:", min_value=1, value=100, step=1)
-                xgb_manual_params['learning_rate'] = st.selectbox("Select learning_rate:", [0.01, 0.1, 0.5])
-                xgb_manual_params['max_depth'] = st.selectbox("Select max_depth:", [3, 5, 10])
-                xgb_manual_params['subsample'] = st.selectbox("Select subsample:", [0.8, 1.0])
-                xgb_manual_params['colsample_bytree'] = st.selectbox("Select colsample_bytree:", [0.8, 1.0])
-            else:
-                xgb_manual_params = None
-
-            if xgb_manual_params:
-                st.write("Using Manual Hyperparameters for XGBoost:")
-                st.write(xgb_manual_params)
-
-            # Perform GridSearchCV if not using manual hyperparameters
-            if not xgb_manual_params:
-                try:
-                    xgb_grid = GridSearchCV(XGBClassifier(random_state=42), xgb_param_grid, cv=5, n_jobs=1)
-                    xgb_grid.fit(X_train, y_train)
-                    xgb_best_params = xgb_grid.best_params_
-                except Exception as e:
-                    st.error(f"Error during GridSearchCV: {e}")
-                    xgb_best_params = xgb_param_grid
-            else:
-                xgb_best_params = xgb_manual_params
-
-            st.write("Best Parameters for XGBoost:")
-            st.write(xgb_best_params)
-
-            # Train and test with best parameters
-            xgb_classifier = XGBClassifier(random_state=42, **xgb_best_params)
-            xgb_classifier.fit(X_train, y_train)
-            y_train_pred_xgb = xgb_classifier.predict(X_train)
-            y_test_pred_xgb = xgb_classifier.predict(X_test)
-
-            st.write("Train Data Classification Report for XGBoost:")
-            st.write(classification_report(y_train, y_train_pred_xgb))
-
-            st.write("Test Data Classification Report for XGBoost:")
-            st.write(classification_report(y_test, y_test_pred_xgb))
-
-            st.subheader("Feature Importance for XGBoost")
-            feature_imp_xgb = pd.Series(xgb_classifier.feature_importances_, index=X.columns).sort_values(ascending=False)
-            st.write(feature_imp_xgb)
-            plt.figure(figsize=(10, 6))
-            sns.barplot(x=feature_imp_xgb, y=feature_imp_xgb.index)
-            plt.xlabel('Feature Importance Score')
-            plt.ylabel('Features')
-            plt.title("Visualizing Important Features for XGBoost")
-            st.pyplot(plt)
+            # Button to display Random Forest Trees
+            if st.button("Show Random Forest Trees"):
+                # Select one of the trees to display
+                estimator = rf_classifier.estimators_[0]
+                dot_data = StringIO()
+                export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
+                                special_characters=True, feature_names=X.columns, class_names=rf_classifier.classes_.astype(str))
+                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                st.graphviz_chart(graph.to_string())
 
 if __name__ == "__main__":
     main()
