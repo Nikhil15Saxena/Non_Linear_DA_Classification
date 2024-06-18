@@ -43,7 +43,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model")
+    st.title("Non-Linear Classification Analysis Model_v2")
 
     # About section
     st.sidebar.title("About")
@@ -63,18 +63,6 @@ def main():
             ---
             """, unsafe_allow_html=True)
     
-# Streamlit app
-def main():
-    st.title("Non-Linear Classification Analysis Model_V2")
-
-    # Enhanced About section
-    st.sidebar.title("About")
-    st.sidebar.markdown("""
-            ### About this App
-            This app allows for comprehensive data analysis, including filtering, factor analysis, and classification using various models.
-                
-            ---
-            """)
 
     st.header("Upload your dataset")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
