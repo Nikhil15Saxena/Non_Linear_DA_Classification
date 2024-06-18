@@ -374,7 +374,7 @@ def main():
             if model_name == 'Random Forest':
                 if st.button("Show Trees for Random Forest"):
                     # Visualize a few trees from the Random Forest
-                                        for i in range(min(3, classifier.n_estimators)):
+                    for i in range(min(3, classifier.n_estimators)):
                         tree = classifier.estimators_[i]
                         dot_data = StringIO()
                         export_graphviz(tree, out_file=dot_data, filled=True, rounded=True,
