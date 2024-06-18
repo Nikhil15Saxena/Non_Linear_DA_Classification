@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from xgboost import XGBClassifier, plot_tree
+from xgboost import XGBClassifier, plot_tree as xgb_plot_tree
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
+from sklearn.model_selection import train_test_split, GridSearchCV
 from factor_analyzer import FactorAnalyzer
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
@@ -12,54 +18,50 @@ from sklearn.tree import export_graphviz
 import pydotplus
 from io import StringIO
 import graphviz
-import matplotlib.pyplot as plt
-import seaborn as sns
-import streamlit as st
-import pandas as pd
-import numpy as np
 
 # CSS to inject contained in a string
 hide_streamlit_style = """
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-.stButton>button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px 24px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 16px;
-    margin: 4px 2px;
-    cursor: pointer;
-    border-radius: 16px;
-}
-</style>
-"""
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            .stButton>button {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 24px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 16px;
+            }
+            </style>
+            """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model_V2")
+    st.title("Non-Linear Classification Analysis Model")
 
     # Enhanced About section
     st.sidebar.title("About")
     st.sidebar.markdown("""
-        ### About this App
-        This app was created by Nikhil Saxena for LMRI team use. It allows for comprehensive data analysis, including filtering, factor analysis, and classification using Random Forest, GBM, and XGBoost models.
-            
-        **Contact:** 
-        - Email: [Nikhil.Saxena@lilly.com](mailto:Nikhil.Saxena@lilly.com)
-            
-        **Features:**
-        - Upload and filter datasets
-        - Perform factor analysis with customizable settings
-        - Train and evaluate classifiers with optional hyperparameter tuning
-        - Visualize results including ROC curves and feature importance
-            
-        ---
-        """, unsafe_allow_html=True)
+            ### About this App
+            This app was created by Nikhil Saxena for LMRI team use. It allows for comprehensive data analysis, including filtering, factor analysis, and classification using Random Forest, Gradient Boosting, and XGBoost.
+                
+            **Contact:** 
+            - Email: [Nikhil.Saxena@lilly.com](mailto:Nikhil.Saxena@lilly.com)
+                
+            **Features:**
+            - Upload and filter datasets
+            - Perform factor analysis with customizable settings
+            - Train and evaluate classifiers (Random Forest, Gradient Boosting, XGBoost) with optional hyperparameter tuning
+            - Visualize results with ROC curves, feature importance, and decision trees
+                
+            ---
+            """, unsafe_allow_html=True)
     
     st.header("Upload your dataset")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -168,10 +170,6 @@ def main():
             variance_df = pd.DataFrame(fa.get_factor_variance(), index=['Variance', 'Proportional Var', 'Cumulative Var']).T
             st.write(variance_df)
 
-            # Communality
-            st.write("Communality:")
-            st.write(pd.DataFrame(fa.get_communalities(), index=df2.columns, columns=["Communality"]))
-
             # User-defined cluster names
             cluster_titles = st.text_input("Enter cluster names (comma-separated):", value="Efficacy,Supply and Samples,Patient Benefits,Cost and Coverage,Approval,MACE")
             cluster_titles = [x.strip() for x in cluster_titles.split(",")]
@@ -180,203 +178,122 @@ def main():
             st.write("Factor Scores:")
             st.write(factor_scores)
 
-            # Model Selection and Training
-            st.header("Model Selection and Training")
-            models = ['Random Forest', 'Gradient Boosting Machine', 'XGBoost']
-            selected_models = st.multiselect("Select models to train and evaluate:", models, default=models)
+            # Random Forest Classifier
+            X = factor_scores
+            X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
+
+            # Model selection and hyperparameter tuning
+            models = {
+                'Random Forest': RandomForestClassifier(random_state=42),
+                'Gradient Boosting': GradientBoostingClassifier(random_state=42),
+                'XGBoost': XGBClassifier(random_state=42, use_label_encoder=False)
+            }
+
+            st.header("Model Selection and Hyperparameter Tuning")
+
+            selected_models = st.multiselect("Select models to train and evaluate:", list(models.keys()), default=['Random Forest'])
 
             for model_name in selected_models:
-                st.subheader(f"{model_name} Classifier")
+                st.subheader(model_name)
 
-                # Default hyperparameters
-                max_depth = 3
-                max_features = 3
-                n_estimators = 500
-                learning_rate = 0.1
-
-                # Toggle for GridSearchCV
-                if st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning"):
+                # Hyperparameters selection
+                use_grid_search = st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning")
+                if use_grid_search:
                     if model_name == 'Random Forest':
-                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='rf_max_depth_range')
-                        max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='rf_max_features_range')
-                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='rf_n_estimators_range')
-
                         param_grid = {
-                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                            'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
-                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
+                            'max_depth': list(range(1, 21)),
+                            'max_features': list(range(1, X.shape[1] + 1)),
+                            'n_estimators': [100, 500, 1000]
                         }
-
-                        rf = RandomForestClassifier(random_state=42)
-                        grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-                        grid_search.fit(X_train, y_train)
-                        best_params = grid_search.best_params_
-                        st.write("Best Hyperparameters found by GridSearchCV:")
-                        st.write(best_params)
-
-                        classifier = RandomForestClassifier(random_state=42, **best_params)
-
-                    elif model_name == 'Gradient Boosting Machine':
-                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='gbm_max_depth_range')
-                        max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='gbm_max_features_range')
-                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='gbm_n_estimators_range')
-                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='gbm_learning_rate_range')
-
+                    elif model_name == 'Gradient Boosting':
                         param_grid = {
-                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                            'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
-                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
-                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
+                            'learning_rate': [0.001, 0.01, 0.1, 0.2, 0.3],
+                            'n_estimators': [50, 100, 200, 500],
+                            'max_depth': list(range(1, 11)),
+                            'max_features': list(range(1, X.shape[1] + 1))
                         }
-
-                        gbm = GradientBoostingClassifier(random_state=42)
-                        grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-                        grid_search.fit(X_train, y_train)
-                        best_params = grid_search.best_params_
-                        st.write("Best Hyperparameters found by GridSearchCV:")
-                        st.write(best_params)
-
-                        classifier = GradientBoostingClassifier(random_state=42, **best_params)
-
                     elif model_name == 'XGBoost':
-                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='xgb_max_depth_range')
-                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='xgb_n_estimators_range')
-                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='xgb_learning_rate_range')
-
                         param_grid = {
-                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
-                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
+                            'learning_rate': [0.001, 0.01, 0.1, 0.2, 0.3],
+                            'n_estimators': [50, 100, 200, 500],
+                            'max_depth': list(range(1, 11)),
+                            'colsample_bytree': [0.5, 0.7, 0.9, 1.0]
                         }
 
-                        xgb = XGBClassifier(random_state=42)
-                        grid_search = GridSearchCV(estimator=xgb, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-                        grid_search.fit(X_train, y_train)
-                        best_params = grid_search.best_params_
-                        st.write("Best Hyperparameters found by GridSearchCV:")
-                        st.write(best_params)
+                    grid_search = GridSearchCV(models[model_name], param_grid, cv=5, n_jobs=-1, scoring='accuracy')
+                    grid_search.fit(X_train, y_train)
 
-                        classifier = XGBClassifier(random_state=42, **best_params)
-
+                    st.write(f"Best Parameters for {model_name}:")
+                    st.write(grid_search.best_params_)
+                    classifier = grid_search.best_estimator_
                 else:
-                    # Ask if the user wants to input hyperparameters manually
-                    if st.checkbox(f"Manually set {model_name} parameters"):
-                        max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3, key=f'{model_name}_max_depth')
-                        max_features = st.number_input("max_features", min_value=1, max_value=df2.shape[1], value=3, key=f'{model_name}_max_features')
-                        n_estimators = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500, key=f'{model_name}_n_estimators')
+                    classifier = models[model_name]
+                    classifier.fit(X_train, y_train)
 
-                        if model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
-                            learning_rate = st.number_input("learning_rate", min_value=0.01, max_value=1.0, value=0.1, key=f'{model_name}_learning_rate')
+                # Predictions
+                y_pred = classifier.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                st.write(f"Accuracy: {accuracy:.2f}")
 
-                    if model_name == 'Random Forest':
-                        classifier = RandomForestClassifier(
-                            random_state=42,
-                            max_depth=max_depth,
-                            max_features=max_features,
-                            n_estimators=n_estimators
-                        )
-                    elif model_name == 'Gradient Boosting Machine':
-                        classifier = GradientBoostingClassifier(
-                            random_state=42,
-                            max_depth=max_depth,
-                            max_features=max_features,
-                            n_estimators=n_estimators,
-                            learning_rate=learning_rate
-                        )
-                    elif model_name == 'XGBoost':
-                        classifier = XGBClassifier(
-                            random_state=42,
-                            max_depth=max_depth,
-                            n_estimators=n_estimators,
-                            learning_rate=learning_rate
-                        )
+                # Confusion Matrix
+                st.write("Confusion Matrix:")
+                cm = confusion_matrix(y_test, y_pred)
+                st.write(cm)
 
-                # Display current hyperparameters
-                st.write(f"Current Hyperparameters used for {model_name}:")
-                if model_name == 'Random Forest':
-                    st.write(f"max_depth: {max_depth}")
-                    st.write(f"max_features: {max_features}")
-                    st.write(f"n_estimators: {n_estimators}")
-                elif model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
-                    st.write(f"max_depth: {max_depth}")
-                    st.write(f"max_features: {max_features}")
-                    st.write(f"n_estimators: {n_estimators}")
-                    if model_name != 'XGBoost':
-                        st.write(f"learning_rate: {learning_rate}")
-
-                # Train and evaluate the model
-                X_train, X_test, y_train, y_test = train_test_split(df2, y, test_size=0.2, random_state=42)
-                classifier.fit(X_train, y_train)
-                y_train_pred = classifier.predict(X_train)
-                y_test_pred = classifier.predict(X_test)
-
-                # Metrics
-                cf_train = confusion_matrix(y_train, y_train_pred)
-                cf_test = confusion_matrix(y_test, y_test_pred)
-                TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
-                TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
-
-                st.write("Train Data Metrics:")
-                st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
-                st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
-                st.write(f"Specificity: {TN_train / (TN_train + FP_train) if (TN_train + FP_train) != 0 else 'Not calculable due to zero division'}")
-
-                st.write("Test Data Metrics:")
-                st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
-                st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
-                st.write(f"Specificity: {TN_test / (TN_test + FP_test) if (TN_test + FP_test) != 0 else 'Not calculable due to zero division'}")
-
+                # Classification Report
                 st.write("Classification Report:")
-                st.text(classification_report(y_test, y_test_pred))
+                st.write(classification_report(y_test, y_pred))
 
-                # Feature Importance
-                if model_name == 'Random Forest':
-                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
-                    imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-                    st.write("Feature Importance for Random Forest:")
-                    st.write(imp_df)
-
-                    # Button to display Random Forest Trees
-                    if st.button("Show Random Forest Trees"):
-                        for estimator in classifier.estimators_:
-                            dot_data = StringIO()
-                            export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
-                                            special_characters=True, feature_names=X_train.columns, class_names=classifier.classes_.astype(str))
-                            graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-                            st.graphviz_chart(graph.to_string())
-
-                elif model_name == 'Gradient Boosting Machine':
-                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
-                    imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-                    st.write("Feature Importance for Gradient Boosting Machine:")
-                    st.write(imp_df)
-
-                elif model_name == 'XGBoost':
-                    plot_tree(classifier)
-                    st.pyplot()
-
-                # Button to display ROC Curve
-                if st.button(f"Show ROC Curve for {model_name}"):
-                    fpr, tpr, _ = roc_curve(y_test, classifier.predict_proba(X_test)[:, 1])
+                # ROC Curve and AUC
+                if hasattr(classifier, "predict_proba"):
+                    st.write("ROC Curve and AUC:")
+                    y_proba = classifier.predict_proba(X_test)[:, 1]
+                    fpr, tpr, thresholds = roc_curve(y_test, y_proba)
                     roc_auc = auc(fpr, tpr)
-                    plt.figure(figsize=(10, 6))
-                    plt.plot(fpr, tpr, color='blue', label=f'ROC curve (area = {roc_auc:.2f})')
-                    plt.plot([0, 1], [0, 1], color='red', linestyle='--')
+
+                    plt.figure(figsize=(8, 6))
+                    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+                    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
                     plt.xlabel('False Positive Rate')
                     plt.ylabel('True Positive Rate')
-                    plt.title(f'Receiver Operating Characteristic (ROC) Curve for {model_name}')
+                    plt.title('Receiver Operating Characteristic (ROC) Curve')
                     plt.legend(loc="lower right")
                     st.pyplot(plt)
 
-    st.markdown(
-        """
-        <style>
-            footer {visibility: hidden;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+                # Feature Importance (if applicable)
+                if hasattr(classifier, "feature_importances_"):
+                    st.write("Feature Importance:")
+                    feature_importance = pd.DataFrame({
+                        'Feature': X.columns,
+                        'Importance': classifier.feature_importances_
+                    })
+                    feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+                    st.write(feature_importance)
 
+                # Decision Tree Visualization (for RandomForest and XGBoost)
+                if model_name == 'Random Forest' or model_name == 'XGBoost':
+                    st.write(f"{model_name} Trees Visualization:")
+                    st.subheader("Tree Options")
+                    if st.checkbox("Display a tree?"):
+                        tree_num = st.number_input("Tree ID", 0, len(classifier.estimators_), 0)
+                        if model_name == 'Random Forest':
+                            if st.button('Generate', key=None):
+                                dot_data = StringIO()
+                                export_graphviz(classifier.estimators_[tree_num], out_file=dot_data, filled=True, rounded=True, special_characters=True, feature_names=X.columns, class_names=np.unique(y).astype('str'))
+                                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                                st.image(graph.create_png())
+                            else:
+                                st.write('Please press the Generate button to create the graph for a given Tree.')
+                        elif model_name == 'XGBoost':
+                            if st.button('Generate', key=None):
+                                xgb.plot_tree(classifier, num_trees=tree_num)
+                                plt.rcParams['figure.figsize'] = [50, 10]
+                                st.pyplot()
+                            else:
+                                st.write('Please press the Generate button to create the graph for a given Tree.')
 
+# Run the Streamlit app
 if __name__ == "__main__":
     main()
