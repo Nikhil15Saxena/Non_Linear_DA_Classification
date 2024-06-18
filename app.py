@@ -7,7 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from xgboost import XGBClassifier, plot_tree as xgb_plot_tree
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
 from sklearn.model_selection import train_test_split, GridSearchCV
 from factor_analyzer import FactorAnalyzer
@@ -17,7 +16,7 @@ from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity, calcu
 from sklearn.tree import export_graphviz
 import pydotplus
 from io import StringIO
-import graphviz
+from xgboost import XGBClassifier, plot_tree as xgb_plot_tree
 
 # CSS to inject contained in a string
 hide_streamlit_style = """
@@ -43,7 +42,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model")
+    st.title("Non-Linear Classification Analysis Model_V2")
 
     # Enhanced About section
     st.sidebar.title("About")
@@ -57,8 +56,8 @@ def main():
             **Features:**
             - Upload and filter datasets
             - Perform factor analysis with customizable settings
-            - Train and evaluate classifiers (Random Forest, Gradient Boosting, XGBoost) with optional hyperparameter tuning
-            - Visualize results with ROC curves, feature importance, and decision trees
+            - Train and evaluate classifiers with optional hyperparameter tuning
+            - Visualize decision trees and feature importance
                 
             ---
             """, unsafe_allow_html=True)
@@ -170,6 +169,10 @@ def main():
             variance_df = pd.DataFrame(fa.get_factor_variance(), index=['Variance', 'Proportional Var', 'Cumulative Var']).T
             st.write(variance_df)
 
+            # Communality
+            st.write("Communality:")
+            st.write(pd.DataFrame(fa.get_communalities(), index=df2.columns, columns=["Communality"]))
+
             # User-defined cluster names
             cluster_titles = st.text_input("Enter cluster names (comma-separated):", value="Efficacy,Supply and Samples,Patient Benefits,Cost and Coverage,Approval,MACE")
             cluster_titles = [x.strip() for x in cluster_titles.split(",")]
@@ -178,122 +181,98 @@ def main():
             st.write("Factor Scores:")
             st.write(factor_scores)
 
-            # Random Forest Classifier
-            X = factor_scores
-            X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
+            # Classifier Selection
+            st.header("Classifier Selection")
+            classifier = st.selectbox("Select Classifier:", ["Random Forest", "Gradient Boosting Machine", "XGBoost"])
 
-            # Model selection and hyperparameter tuning
-            models = {
-                'Random Forest': RandomForestClassifier(random_state=42),
-                'Gradient Boosting': GradientBoostingClassifier(random_state=42),
-                'XGBoost': XGBClassifier(random_state=42, use_label_encoder=False)
-            }
+            # Model Training and Evaluation
+            if st.button("Train and Evaluate"):
+                X = factor_scores
+                X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
 
-            st.header("Model Selection and Hyperparameter Tuning")
+                if classifier == "Random Forest":
+                    max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3)
+                    max_features = st.number_input("max_features", min_value=1, max_value=X.shape[1], value=3)
+                    n_estimators = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500)
 
-            selected_models = st.multiselect("Select models to train and evaluate:", list(models.keys()), default=['Random Forest'])
+                    rf_classifier = RandomForestClassifier(
+                        random_state=42,
+                        max_depth=max_depth,
+                        max_features=max_features,
+                        n_estimators=n_estimators
+                    )
 
-            for model_name in selected_models:
-                st.subheader(model_name)
+                elif classifier == "Gradient Boosting Machine":
+                    max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3)
+                    learning_rate = st.number_input("learning_rate", min_value=0.01, max_value=1.0, step=0.1, value=0.1)
+                    n_estimators = st.number_input("n_estimators", min_value=50, max_value=500, step=50, value=100)
 
-                # Hyperparameters selection
-                use_grid_search = st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning")
-                if use_grid_search:
-                    if model_name == 'Random Forest':
-                        param_grid = {
-                            'max_depth': list(range(1, 21)),
-                            'max_features': list(range(1, X.shape[1] + 1)),
-                            'n_estimators': [100, 500, 1000]
-                        }
-                    elif model_name == 'Gradient Boosting':
-                        param_grid = {
-                            'learning_rate': [0.001, 0.01, 0.1, 0.2, 0.3],
-                            'n_estimators': [50, 100, 200, 500],
-                            'max_depth': list(range(1, 11)),
-                            'max_features': list(range(1, X.shape[1] + 1))
-                        }
-                    elif model_name == 'XGBoost':
-                        param_grid = {
-                            'learning_rate': [0.001, 0.01, 0.1, 0.2, 0.3],
-                            'n_estimators': [50, 100, 200, 500],
-                            'max_depth': list(range(1, 11)),
-                            'colsample_bytree': [0.5, 0.7, 0.9, 1.0]
-                        }
+                    rf_classifier = GradientBoostingClassifier(
+                        random_state=42,
+                        max_depth=max_depth,
+                        learning_rate=learning_rate,
+                        n_estimators=n_estimators
+                    )
 
-                    grid_search = GridSearchCV(models[model_name], param_grid, cv=5, n_jobs=-1, scoring='accuracy')
-                    grid_search.fit(X_train, y_train)
+                elif classifier == "XGBoost":
+                    max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3)
+                    learning_rate = st.number_input("learning_rate", min_value=0.01, max_value=1.0, step=0.1, value=0.1)
+                    n_estimators = st.number_input("n_estimators", min_value=50, max_value=500, step=50, value=100)
 
-                    st.write(f"Best Parameters for {model_name}:")
-                    st.write(grid_search.best_params_)
-                    classifier = grid_search.best_estimator_
-                else:
-                    classifier = models[model_name]
-                    classifier.fit(X_train, y_train)
+                    rf_classifier = XGBClassifier(
+                        random_state=42,
+                        max_depth=max_depth,
+                        learning_rate=learning_rate,
+                        n_estimators=n_estimators
+                    )
 
-                # Predictions
-                y_pred = classifier.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                st.write(f"Accuracy: {accuracy:.2f}")
+                rf_classifier.fit(X_train, y_train)
+                y_train_pred = rf_classifier.predict(X_train)
+                y_test_pred = rf_classifier.predict(X_test)
 
-                # Confusion Matrix
-                st.write("Confusion Matrix:")
-                cm = confusion_matrix(y_test, y_pred)
-                st.write(cm)
+                # Metrics
+                cf_train = confusion_matrix(y_train, y_train_pred)
+                cf_test = confusion_matrix(y_test, y_test_pred)
+                TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
+                TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
 
-                # Classification Report
+                st.write("Train Data Metrics:")
+                st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
+                st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
+                st.write(f"Specificity: {TN_train / (TN_train + FP_train)}")
+
+                st.write("Test Data Metrics:")
+                st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
+                st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
+                st.write(f"Specificity: {TN_test / (TN_test + FP_test)}")
+
                 st.write("Classification Report:")
-                st.write(classification_report(y_test, y_pred))
+                st.text(classification_report(y_test, y_test_pred))
 
-                # ROC Curve and AUC
-                if hasattr(classifier, "predict_proba"):
-                    st.write("ROC Curve and AUC:")
-                    y_proba = classifier.predict_proba(X_test)[:, 1]
-                    fpr, tpr, thresholds = roc_curve(y_test, y_proba)
-                    roc_auc = auc(fpr, tpr)
+                # Feature Importance
+                if classifier == 'XGBoost':
+                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
+                else:
+                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
+                
+                imp_df.sort_values(by="Imp", ascending=False, inplace=True)
+                st.write(f"{classifier} Feature Importance:")
+                st.write(imp_df)
 
-                    plt.figure(figsize=(8, 6))
-                    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
-                    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-                    plt.xlim([0.0, 1.0])
-                    plt.ylim([0.0, 1.05])
-                    plt.xlabel('False Positive Rate')
-                    plt.ylabel('True Positive Rate')
-                    plt.title('Receiver Operating Characteristic (ROC) Curve')
-                    plt.legend(loc="lower right")
-                    st.pyplot(plt)
+                # Button to display Tree
+                if st.button(f"Show {classifier} Tree"):
+                    if classifier == 'XGBoost':
+                        estimator = rf_classifier.get_booster()
+                        dot_data = StringIO()
+                        xgb_plot_tree(estimator, num_trees=0, ax=None, rankdir='UT', **xgb_plot_tree_args)
+                        st.pyplot(plt)
+                    else:
+                        estimator = rf_classifier.estimators_[0]
+                        dot_data = StringIO()
+                        export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
+                                        special_characters=True, feature_names=X.columns, class_names=rf_classifier.classes_.astype(str))
+                        graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                        st.graphviz_chart(graph.to_string())
 
-                # Feature Importance (if applicable)
-                if hasattr(classifier, "feature_importances_"):
-                    st.write("Feature Importance:")
-                    feature_importance = pd.DataFrame({
-                        'Feature': X.columns,
-                        'Importance': classifier.feature_importances_
-                    })
-                    feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
-                    st.write(feature_importance)
-
-                # Decision Tree Visualization (for RandomForest and XGBoost)
-                if model_name == 'Random Forest' or model_name == 'XGBoost':
-                    st.write(f"{model_name} Trees Visualization:")
-                    st.subheader("Tree Options")
-                    if st.checkbox("Display a tree?"):
-                        tree_num = st.number_input("Tree ID", 0, len(classifier.estimators_), 0)
-                        if model_name == 'Random Forest':
-                            if st.button('Generate', key=None):
-                                dot_data = StringIO()
-                                export_graphviz(classifier.estimators_[tree_num], out_file=dot_data, filled=True, rounded=True, special_characters=True, feature_names=X.columns, class_names=np.unique(y).astype('str'))
-                                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-                                st.image(graph.create_png())
-                            else:
-                                st.write('Please press the Generate button to create the graph for a given Tree.')
-                        elif model_name == 'XGBoost':
-                            if st.button('Generate', key=None):
-                                xgb.plot_tree(classifier, num_trees=tree_num)
-                                plt.rcParams['figure.figsize'] = [50, 10]
-                                st.pyplot()
-                            else:
-                                st.write('Please press the Generate button to create the graph for a given Tree.')
-
-# Run the Streamlit app
 if __name__ == "__main__":
     main()
