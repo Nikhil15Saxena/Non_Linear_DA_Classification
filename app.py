@@ -183,208 +183,208 @@ def main():
             models = ['Random Forest', 'Gradient Boosting Machine', 'XGBoost']
             selected_models = st.multiselect("Select models to train and evaluate:", models, default=models)
 
- for model_name in selected_models:
-    st.subheader(f"{model_name} Classifier")
-
-    # Default hyperparameters
-    max_depth = 3
-    max_features = 3
-    n_estimators = 500
-    learning_rate = 0.1
-
-    # Toggle for GridSearchCV
-    if st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning"):
-        if model_name == 'Random Forest':
-            max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='rf_max_depth_range')
-            max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='rf_max_features_range')
-            n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='rf_n_estimators_range')
-
-            param_grid = {
-                'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
-                'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
-            }
-
-            rf = RandomForestClassifier(random_state=42)
-            grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-            grid_search.fit(X_train, y_train)
-            best_params = grid_search.best_params_
-            st.write("Best Hyperparameters found by GridSearchCV:")
-            st.write(best_params)
-
-            classifier = RandomForestClassifier(random_state=42, **best_params)
-
-        elif model_name == 'Gradient Boosting Machine':
-            max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='gbm_max_depth_range')
-            max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='gbm_max_features_range')
-            n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='gbm_n_estimators_range')
-            learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='gbm_learning_rate_range')
-
-            param_grid = {
-                'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
-                'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
-                'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
-            }
-
-            gbm = GradientBoostingClassifier(random_state=42)
-            grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-            grid_search.fit(X_train, y_train)
-            best_params = grid_search.best_params_
-            st.write("Best Hyperparameters found by GridSearchCV:")
-            st.write(best_params)
-
-            classifier = GradientBoostingClassifier(random_state=42, **best_params)
-
-        elif model_name == 'XGBoost':
-            max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='xgb_max_depth_range')
-            n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='xgb_n_estimators_range')
-            learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='xgb_learning_rate_range')
-
-            param_grid = {
-                'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
-                'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
-                'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
-            }
-
-            xgb = XGBClassifier(random_state=42)
-            grid_search = GridSearchCV(estimator=xgb, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-            grid_search.fit(X_train, y_train)
-            best_params = grid_search.best_params_
-            st.write("Best Hyperparameters found by GridSearchCV:")
-            st.write(best_params)
-
-            classifier = XGBClassifier(random_state=42, **best_params)
-
-    else:
-        # Ask if the user wants to input hyperparameters manually
-        if st.checkbox(f"Manually set {model_name} parameters"):
-            max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3, key=f'{model_name}_max_depth')
-            max_features = st.number_input("max_features", min_value=1, max_value=df2.shape[1], value=3, key=f'{model_name}_max_features')
-            n_estimators = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500, key=f'{model_name}_n_estimators')
-
-            if model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
-                learning_rate = st.number_input("learning_rate", min_value=0.01, max_value=1.0, value=0.1, key=f'{model_name}_learning_rate')
-
-        if model_name == 'Random Forest':
-            classifier = RandomForestClassifier(
-                random_state=42,
-                max_depth=max_depth,
-                max_features=max_features,
-                n_estimators=n_estimators
+            for model_name in selected_models:
+                st.subheader(f"{model_name} Classifier")
+            
+                # Default hyperparameters
+                max_depth = 3
+                max_features = 3
+                n_estimators = 500
+                learning_rate = 0.1
+            
+                # Toggle for GridSearchCV
+                if st.checkbox(f"Use GridSearchCV for {model_name} hyperparameter tuning"):
+                    if model_name == 'Random Forest':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='rf_max_depth_range')
+                        max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='rf_max_features_range')
+                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='rf_n_estimators_range')
+            
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100))
+                        }
+            
+                        rf = RandomForestClassifier(random_state=42)
+                        grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
+                        grid_search.fit(X_train, y_train)
+                        best_params = grid_search.best_params_
+                        st.write("Best Hyperparameters found by GridSearchCV:")
+                        st.write(best_params)
+            
+                        classifier = RandomForestClassifier(random_state=42, **best_params)
+            
+                    elif model_name == 'Gradient Boosting Machine':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='gbm_max_depth_range')
+                        max_features_range = st.slider("Select max_features range", 1, df2.shape[1], (1, 5), key='gbm_max_features_range')
+                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='gbm_n_estimators_range')
+                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='gbm_learning_rate_range')
+            
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'max_features': list(range(max_features_range[0], max_features_range[1] + 1)),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
+                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
+                        }
+            
+                        gbm = GradientBoostingClassifier(random_state=42)
+                        grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
+                        grid_search.fit(X_train, y_train)
+                        best_params = grid_search.best_params_
+                        st.write("Best Hyperparameters found by GridSearchCV:")
+                        st.write(best_params)
+            
+                        classifier = GradientBoostingClassifier(random_state=42, **best_params)
+            
+                    elif model_name == 'XGBoost':
+                        max_depth_range = st.slider("Select max_depth range", 1, 20, (1, 10), key='xgb_max_depth_range')
+                        n_estimators_range = st.slider("Select n_estimators range", 100, 1000, (100, 500), step=100, key='xgb_n_estimators_range')
+                        learning_rate_range = st.slider("Select learning_rate range", 0.01, 1.0, (0.1, 0.5), key='xgb_learning_rate_range')
+            
+                        param_grid = {
+                            'max_depth': list(range(max_depth_range[0], max_depth_range[1] + 1)),
+                            'n_estimators': list(range(n_estimators_range[0], n_estimators_range[1] + 1, 100)),
+                            'learning_rate': np.arange(learning_rate_range[0], learning_rate_range[1] + 0.01, 0.01)
+                        }
+            
+                        xgb = XGBClassifier(random_state=42)
+                        grid_search = GridSearchCV(estimator=xgb, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
+                        grid_search.fit(X_train, y_train)
+                        best_params = grid_search.best_params_
+                        st.write("Best Hyperparameters found by GridSearchCV:")
+                        st.write(best_params)
+            
+                        classifier = XGBClassifier(random_state=42, **best_params)
+            
+                else:
+                    # Ask if the user wants to input hyperparameters manually
+                    if st.checkbox(f"Manually set {model_name} parameters"):
+                        max_depth = st.number_input("max_depth", min_value=1, max_value=20, value=3, key=f'{model_name}_max_depth')
+                        max_features = st.number_input("max_features", min_value=1, max_value=df2.shape[1], value=3, key=f'{model_name}_max_features')
+                        n_estimators = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500, key=f'{model_name}_n_estimators')
+            
+                        if model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
+                            learning_rate = st.number_input("learning_rate", min_value=0.01, max_value=1.0, value=0.1, key=f'{model_name}_learning_rate')
+            
+                    if model_name == 'Random Forest':
+                        classifier = RandomForestClassifier(
+                            random_state=42,
+                            max_depth=max_depth,
+                            max_features=max_features,
+                            n_estimators=n_estimators
+                        )
+                    elif model_name == 'Gradient Boosting Machine':
+                        classifier = GradientBoostingClassifier(
+                            random_state=42,
+                            max_depth=max_depth,
+                            max_features=max_features,
+                            n_estimators=n_estimators,
+                            learning_rate=learning_rate
+                        )
+                    elif model_name == 'XGBoost':
+                        classifier = XGBClassifier(
+                            random_state=42,
+                            max_depth=max_depth,
+                            n_estimators=n_estimators,
+                            learning_rate=learning_rate
+                        )
+            
+                # Display current hyperparameters
+                st.write(f"Current Hyperparameters used for {model_name}:")
+                if model_name == 'Random Forest':
+                    st.write(f"max_depth: {max_depth}")
+                    st.write(f"max_features: {max_features}")
+                    st.write(f"n_estimators: {n_estimators}")
+                elif model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
+                    st.write(f"max_depth: {max_depth}")
+                    st.write(f"max_features: {max_features}")
+                    st.write(f"n_estimators: {n_estimators}")
+                    st.write(f"learning_rate: {learning_rate}")
+            
+                # Train and evaluate the model
+                classifier.fit(X_train, y_train)
+                y_train_pred = classifier.predict(X_train)
+                y_test_pred = classifier.predict(X_test)
+            
+                # Metrics
+                cf_train = confusion_matrix(y_train, y_train_pred)
+                cf_test = confusion_matrix(y_test, y_test_pred)
+                TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
+                TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
+            
+                st.write("Train Data Metrics:")
+                st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
+                st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
+                st.write(f"Specificity: {TN_train / (TN_train + FP_train) if (TN_train + FP_train) != 0 else 'Not calculable due to zero division'}")
+            
+                st.write("Test Data Metrics:")
+                st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
+                st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
+                st.write(f"Specificity: {TN_test / (TN_test + FP_test) if (TN_test + FP_test) != 0 else 'Not calculable due to zero division'}")
+            
+                st.write("Classification Report:")
+                st.text(classification_report(y_test, y_test_pred))
+            
+                # Feature Importance
+                if model_name == 'Random Forest':
+                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
+                    imp_df.sort_values(by="Imp", ascending=False, inplace=True)
+                    st.write("Feature Importance for Random Forest:")
+                    st.write(imp_df)
+            
+                    # Button to display Random Forest Trees
+                    if st.button("Show Random Forest Trees"):
+                        for estimator in classifier.estimators_:
+                            dot_data = StringIO()
+                            export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
+                                            special_characters=True, feature_names=X.columns, class_names=classifier.classes_.astype(str))
+                            graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                            st.graphviz_chart(graph.to_string())
+            
+                elif model_name == 'Gradient Boosting Machine':
+                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
+                    imp_df.sort_values(by="Imp", ascending=False, inplace=True)
+                    st.write("Feature Importance for Gradient Boosting Machine:")
+                    st.write(imp_df)
+            
+                    # Button to display GBM Trees
+                    if st.button("Show Gradient Boosting Trees"):
+                        for tree_idx, tree in enumerate(classifier.estimators_):
+                            dot_data = export_graphviz(tree, out_file=None, filled=True, rounded=True, special_characters=True, feature_names=X_train.columns)
+                            graph = pydotplus.graph_from_dot_data(dot_data)
+                            st.graphviz_chart(graph.to_string())
+            
+                elif model_name == 'XGBoost':
+                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
+                    imp_df.sort_values(by="Imp", ascending=False, inplace=True)
+                    st.write("Feature Importance for XGBoost:")
+                    st.write(imp_df)
+            
+                    # Button to display XGBoost Trees
+                    if st.button("Show XGBoost Trees"):
+                        for tree_idx in range(classifier.n_estimators):
+                            fig, ax = plt.subplots(figsize=(20, 20))
+                            plot_tree(classifier, num_trees=tree_idx, ax=ax)
+                            st.pyplot(fig)
+            
+                # Button to display ROC Curve
+                if st.button(f"Show ROC Curve for {model_name}"):
+                    fpr, tpr, _ = roc_curve(y_test, classifier.predict_proba(X_test)[:, 1])
+                    roc_auc = auc(fpr, tpr)
+                    plt.figure(figsize=(10, 6))
+                    plt.plot(fpr, tpr, color='blue', label=f'ROC curve (area = {roc_auc:.2f})')
+                    plt.plot([0, 1], [0, 1], color='red', linestyle='--')
+                    plt.xlabel('False Positive Rate')
+                    plt.ylabel('True Positive Rate')
+                    plt.title(f'Receiver Operating Characteristic (ROC) Curve for {model_name}')
+                    plt.legend(loc="lower right")
+                    st.pyplot(plt)
+            
+            st.markdown(
+                """
+                <style>
+                    footer {visibility: hidden;}
+                </style>
+                """,
+                unsafe_allow_html=True,
             )
-        elif model_name == 'Gradient Boosting Machine':
-            classifier = GradientBoostingClassifier(
-                random_state=42,
-                max_depth=max_depth,
-                max_features=max_features,
-                n_estimators=n_estimators,
-                learning_rate=learning_rate
-            )
-        elif model_name == 'XGBoost':
-            classifier = XGBClassifier(
-                random_state=42,
-                max_depth=max_depth,
-                n_estimators=n_estimators,
-                learning_rate=learning_rate
-            )
-
-    # Display current hyperparameters
-    st.write(f"Current Hyperparameters used for {model_name}:")
-    if model_name == 'Random Forest':
-        st.write(f"max_depth: {max_depth}")
-        st.write(f"max_features: {max_features}")
-        st.write(f"n_estimators: {n_estimators}")
-    elif model_name == 'Gradient Boosting Machine' or model_name == 'XGBoost':
-        st.write(f"max_depth: {max_depth}")
-        st.write(f"max_features: {max_features}")
-        st.write(f"n_estimators: {n_estimators}")
-        st.write(f"learning_rate: {learning_rate}")
-
-    # Train and evaluate the model
-    classifier.fit(X_train, y_train)
-    y_train_pred = classifier.predict(X_train)
-    y_test_pred = classifier.predict(X_test)
-
-    # Metrics
-    cf_train = confusion_matrix(y_train, y_train_pred)
-    cf_test = confusion_matrix(y_test, y_test_pred)
-    TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
-    TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
-
-    st.write("Train Data Metrics:")
-    st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
-    st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
-    st.write(f"Specificity: {TN_train / (TN_train + FP_train) if (TN_train + FP_train) != 0 else 'Not calculable due to zero division'}")
-
-    st.write("Test Data Metrics:")
-    st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
-    st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
-    st.write(f"Specificity: {TN_test / (TN_test + FP_test) if (TN_test + FP_test) != 0 else 'Not calculable due to zero division'}")
-
-    st.write("Classification Report:")
-    st.text(classification_report(y_test, y_test_pred))
-
-    # Feature Importance
-    if model_name == 'Random Forest':
-        imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
-        imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-        st.write("Feature Importance for Random Forest:")
-        st.write(imp_df)
-
-        # Button to display Random Forest Trees
-        if st.button("Show Random Forest Trees"):
-            for estimator in classifier.estimators_:
-                dot_data = StringIO()
-                export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
-                                special_characters=True, feature_names=X.columns, class_names=classifier.classes_.astype(str))
-                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-                st.graphviz_chart(graph.to_string())
-
-    elif model_name == 'Gradient Boosting Machine':
-        imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
-        imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-        st.write("Feature Importance for Gradient Boosting Machine:")
-        st.write(imp_df)
-
-        # Button to display GBM Trees
-        if st.button("Show Gradient Boosting Trees"):
-            for tree_idx, tree in enumerate(classifier.estimators_):
-                dot_data = export_graphviz(tree, out_file=None, filled=True, rounded=True, special_characters=True, feature_names=X_train.columns)
-                graph = pydotplus.graph_from_dot_data(dot_data)
-                st.graphviz_chart(graph.to_string())
-
-    elif model_name == 'XGBoost':
-        imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": classifier.feature_importances_ * 100})
-        imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-        st.write("Feature Importance for XGBoost:")
-        st.write(imp_df)
-
-        # Button to display XGBoost Trees
-        if st.button("Show XGBoost Trees"):
-            for tree_idx in range(classifier.n_estimators):
-                fig, ax = plt.subplots(figsize=(20, 20))
-                plot_tree(classifier, num_trees=tree_idx, ax=ax)
-                st.pyplot(fig)
-
-    # Button to display ROC Curve
-    if st.button(f"Show ROC Curve for {model_name}"):
-        fpr, tpr, _ = roc_curve(y_test, classifier.predict_proba(X_test)[:, 1])
-        roc_auc = auc(fpr, tpr)
-        plt.figure(figsize=(10, 6))
-        plt.plot(fpr, tpr, color='blue', label=f'ROC curve (area = {roc_auc:.2f})')
-        plt.plot([0, 1], [0, 1], color='red', linestyle='--')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title(f'Receiver Operating Characteristic (ROC) Curve for {model_name}')
-        plt.legend(loc="lower right")
-        st.pyplot(plt)
-
-st.markdown(
-    """
-    <style>
-        footer {visibility: hidden;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
