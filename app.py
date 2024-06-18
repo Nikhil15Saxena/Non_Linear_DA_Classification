@@ -206,9 +206,13 @@ def main():
 
             # Perform GridSearchCV if not using manual hyperparameters
             if not rf_manual_params:
-                rf_grid = GridSearchCV(RandomForestClassifier(random_state=42), rf_param_grid, cv=5, n_jobs=-1)
-                rf_grid.fit(X_train, y_train)
-                rf_best_params = rf_grid.best_params_
+                try:
+                    rf_grid = GridSearchCV(RandomForestClassifier(random_state=42), rf_param_grid, cv=5, n_jobs=1)
+                    rf_grid.fit(X_train, y_train)
+                    rf_best_params = rf_grid.best_params_
+                except Exception as e:
+                    st.error(f"Error during GridSearchCV: {e}")
+                    rf_best_params = rf_param_grid
             else:
                 rf_best_params = rf_manual_params
 
@@ -266,9 +270,13 @@ def main():
 
             # Perform GridSearchCV if not using manual hyperparameters
             if not gb_manual_params:
-                gb_grid = GridSearchCV(GradientBoostingClassifier(random_state=42), gb_param_grid, cv=5, n_jobs=-1)
-                gb_grid.fit(X_train, y_train)
-                gb_best_params = gb_grid.best_params_
+                try:
+                    gb_grid = GridSearchCV(GradientBoostingClassifier(random_state=42), gb_param_grid, cv=5, n_jobs=1)
+                    gb_grid.fit(X_train, y_train)
+                    gb_best_params = gb_grid.best_params_
+                except Exception as e:
+                    st.error(f"Error during GridSearchCV: {e}")
+                    gb_best_params = gb_param_grid
             else:
                 gb_best_params = gb_manual_params
 
@@ -326,9 +334,13 @@ def main():
 
             # Perform GridSearchCV if not using manual hyperparameters
             if not xgb_manual_params:
-                xgb_grid = GridSearchCV(XGBClassifier(random_state=42), xgb_param_grid, cv=5, n_jobs=-1)
-                xgb_grid.fit(X_train, y_train)
-                xgb_best_params = xgb_grid.best_params_
+                try:
+                    xgb_grid = GridSearchCV(XGBClassifier(random_state=42), xgb_param_grid, cv=5, n_jobs=1)
+                    xgb_grid.fit(X_train, y_train)
+                    xgb_best_params = xgb_grid.best_params_
+                except Exception as e:
+                    st.error(f"Error during GridSearchCV: {e}")
+                    xgb_best_params = xgb_param_grid
             else:
                 xgb_best_params = xgb_manual_params
 
