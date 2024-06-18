@@ -42,7 +42,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model_V2")
+    st.title("Non-Linear Classification Analysis Model")
 
     # About section
     st.sidebar.title("About")
@@ -181,71 +181,72 @@ def main():
             st.write("Factor Scores:")
             st.write(factor_scores)
 
-            # Classifier Selection
-            st.header("Classifier Selection")
-            classifier = st.selectbox("Select Classifier:", ["Random Forest", "Gradient Boosting Machine", "XGBoost"])
+            st.header("Model Training and Evaluation")
 
-            # Model Training and Evaluation
-            if st.button("Train and Evaluate"):
-                X = factor_scores
-                X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, random_state=42)
+            # Random Forest
+            st.subheader("Random Forest")
+            rf_classifier = RandomForestClassifier(random_state=42)
+            X_train, X_test, y_train, y_test = train_test_split(factor_scores, y, train_size=0.7, random_state=42)
+            rf_classifier.fit(X_train, y_train)
+            y_train_pred_rf = rf_classifier.predict(X_train)
+            y_test_pred_rf = rf_classifier.predict(X_test)
 
-                if classifier == "Random Forest":
-                    rf_classifier = RandomForestClassifier(random_state=42)
+            st.write("Random Forest - Classification Report (Test Data):")
+            st.text(classification_report(y_test, y_test_pred_rf))
 
-                elif classifier == "Gradient Boosting Machine":
-                    rf_classifier = GradientBoostingClassifier(random_state=42)
+            # Feature Importance
+            imp_df_rf = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
+            imp_df_rf.sort_values(by="Imp", ascending=False, inplace=True)
+            st.write("Random Forest - Feature Importance:")
+            st.write(imp_df_rf)
 
-                elif classifier == "XGBoost":
-                    rf_classifier = XGBClassifier(random_state=42)
+            # Gradient Boosting Machine
+            st.subheader("Gradient Boosting Machine")
+            gbm_classifier = GradientBoostingClassifier(random_state=42)
+            gbm_classifier.fit(X_train, y_train)
+            y_train_pred_gbm = gbm_classifier.predict(X_train)
+            y_test_pred_gbm = gbm_classifier.predict(X_test)
 
-                rf_classifier.fit(X_train, y_train)
-                y_train_pred = rf_classifier.predict(X_train)
-                y_test_pred = rf_classifier.predict(X_test)
+            st.write("Gradient Boosting Machine - Classification Report (Test Data):")
+            st.text(classification_report(y_test, y_test_pred_gbm))
 
-                # Metrics
-                cf_train = confusion_matrix(y_train, y_train_pred)
-                cf_test = confusion_matrix(y_test, y_test_pred)
-                TN_train, FN_train, FP_train, TP_train = cf_train.ravel()
-                TN_test, FN_test, FP_test, TP_test = cf_test.ravel()
+            # Feature Importance
+            imp_df_gbm = pd.DataFrame({"varname": X_train.columns, "Imp": gbm_classifier.feature_importances_ * 100})
+            imp_df_gbm.sort_values(by="Imp", ascending=False, inplace=True)
+            st.write("Gradient Boosting Machine - Feature Importance:")
+            st.write(imp_df_gbm)
 
-                st.write("Train Data Metrics:")
-                st.write(f"Accuracy: {accuracy_score(y_train, y_train_pred)}")
-                st.write(f"Sensitivity: {TP_train / (TP_train + FN_train)}")
-                st.write(f"Specificity: {TN_train / (TN_train + FP_train)}")
+            # XGBoost
+            st.subheader("XGBoost")
+            xgb_classifier = XGBClassifier(random_state=42)
+            xgb_classifier.fit(X_train, y_train)
+            y_train_pred_xgb = xgb_classifier.predict(X_train)
+            y_test_pred_xgb = xgb_classifier.predict(X_test)
 
-                st.write("Test Data Metrics:")
-                st.write(f"Accuracy: {accuracy_score(y_test, y_test_pred)}")
-                st.write(f"Sensitivity: {TP_test / (TP_test + FN_test)}")
-                st.write(f"Specificity: {TN_test / (TN_test + FP_test)}")
+            st.write("XGBoost - Classification Report (Test Data):")
+            st.text(classification_report(y_test, y_test_pred_xgb))
 
-                st.write("Classification Report:")
-                st.text(classification_report(y_test, y_test_pred))
+            # Feature Importance
+            imp_df_xgb = pd.DataFrame({"varname": X_train.columns, "Imp": xgb_classifier.feature_importances_ * 100})
+            imp_df_xgb.sort_values(by="Imp", ascending=False, inplace=True)
+            st.write("XGBoost - Feature Importance:")
+            st.write(imp_df_xgb)
 
-                # Feature Importance
-                if classifier == 'XGBoost':
-                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
-                else:
-                    imp_df = pd.DataFrame({"varname": X_train.columns, "Imp": rf_classifier.feature_importances_ * 100})
+            # Button to display Random Forest Trees
+            if st.button("Show Random Forest Trees"):
+                estimator = rf_classifier.estimators_[0]
+                dot_data = StringIO()
+                export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
+                                special_characters=True, feature_names=X_train.columns, class_names=rf_classifier.classes_.astype(str))
+                graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+                st.graphviz_chart(graph.to_string())
 
-                imp_df.sort_values(by="Imp", ascending=False, inplace=True)
-                st.write(f"{classifier} Feature Importance:")
-                st.write(imp_df)
-
-                # Button to display Tree
-                if st.button(f"Show {classifier} Tree"):
-                    if classifier == 'XGBoost':
-                        estimator = rf_classifier.get_booster()
-                        dot_data = StringIO()
-                        xgb_plot_tree(estimator, num_trees=0, ax=None, rankdir='UT')
-                        st.pyplot(plt)
-                    else:
-                        estimator = rf_classifier.estimators_[0]
-                        dot_data = StringIO()
-                        export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
-                                        special_characters=True, feature_names=X.columns, class_names=rf_classifier.classes_.astype(str))
-                        graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-                        st.graphviz_chart(graph.to_string())
+            # Button to display XGBoost Trees
+            if st.button("Show XGBoost Trees"):
+                estimator = xgb_classifier.get_booster()
+                dot_data = StringIO()
+                xgb_plot_tree(estimator, num_trees=0, ax=None, rankdir='UT')
+                st.pyplot(plt)
 
 if __name__ == "__main__":
     main()
