@@ -15,7 +15,7 @@ from statsmodels.tools.tools import add_constant
 from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity, calculate_kmo
 from sklearn.tree import export_graphviz
 import pydotplus
-from io import StringIO
+from io import StringIO, BytesIO
 import graphviz
 import xgboost as xgb
 
@@ -43,7 +43,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model_check")
+    st.title("Non-Linear Classification Analysis Model_chk1")
 
     # Enhanced About section
     st.sidebar.title("About")
@@ -80,12 +80,19 @@ def main():
         filter_columns = st.multiselect("Select columns to filter:", df.columns)
         filters = {}
         for col in filter_columns:
-            filters[col] = st.text_input(f"Enter value to filter in '{col}' column:")
+            if pd.api.types.is_numeric_dtype(df[col]):
+                min_val, max_val = float(df[col].min()), float(df[col].max())
+                filters[col] = st.slider(f"Select range for '{col}':", min_value=min_val, max_value=max_val, value=(min_val, max_val))
+            else:
+                filters[col] = st.text_input(f"Enter value to filter in '{col}' column:")
 
         filtered_df = df.copy()
         for col, val in filters.items():
-            if val:
-                filtered_df = filtered_df[filtered_df[col] == val]
+            if pd.api.types.is_numeric_dtype(df[col]):
+                filtered_df = filtered_df[(filtered_df[col] >= val[0]) & (filtered_df[col] <= val[1])]
+            else:
+                if val:
+                    filtered_df = filtered_df[filtered_df[col] == val]
 
         st.write("Filtered Data:")
         st.write(filtered_df)
@@ -166,6 +173,10 @@ def main():
             st.write("Factor Loadings:")
             st.write(fa_df)
 
+            # Download factor loadings as CSV
+            csv = fa_df.to_csv().encode('utf-8')
+            st.download_button(label="Download Factor Loadings as CSV", data=csv, file_name='factor_loadings.csv', mime='text/csv')
+
             st.write("Factor Variance:")
             variance_df = pd.DataFrame(fa.get_factor_variance(), index=['Variance', 'Proportional Var', 'Cumulative Var']).T
             st.write(variance_df)
@@ -220,23 +231,25 @@ def main():
             # GridSearchCV
             grid_search_params = st.checkbox("Use GridSearchCV for hyperparameter tuning")
             if grid_search_params:
+                st.write(f"Define GridSearchCV parameters for {model_selection}:")
+                param_grid = {}
                 if model_selection == 'RandomForest':
                     param_grid = {
-                        'max_depth': [2, 3, 5, 10, 15],
-                        'max_features': [1, 2, 3, 5],
-                        'n_estimators': [100, 200, 500]
+                        'max_depth': st.multiselect("max_depth", [2, 3, 5, 10, 15], default=[3]),
+                        'max_features': st.multiselect("max_features", list(range(1, X.shape[1] + 1)), default=[3]),
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 500], default=[500])
                     }
                 elif model_selection == 'GBM':
                     param_grid = {
-                        'learning_rate': [0.01, 0.1, 0.2],
-                        'n_estimators': [100, 200, 300],
-                        'max_depth': [3, 5, 7]
+                        'learning_rate': st.multiselect("learning_rate", [0.01, 0.1, 0.2], default=[0.1]),
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300], default=[100]),
+                        'max_depth': st.multiselect("max_depth", [3, 5, 7], default=[3])
                     }
                 elif model_selection == 'XGBoost':
                     param_grid = {
-                        'learning_rate': [0.01, 0.1, 0.2],
-                        'n_estimators': [100, 200, 300],
-                        'max_depth': [3, 5, 7]
+                        'learning_rate': st.multiselect("learning_rate", [0.01, 0.1, 0.2], default=[0.1]),
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300], default=[100]),
+                        'max_depth': st.multiselect("max_depth", [3, 5, 7], default=[3])
                     }
             
                 st.write(f"Running GridSearchCV for {model_selection}...")
