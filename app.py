@@ -43,7 +43,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("Non-Linear Classification Analysis Model_V2")
+    st.title("Non-Linear Classification Analysis Model_check")
 
     # Enhanced About section
     st.sidebar.title("About")
