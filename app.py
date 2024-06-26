@@ -153,7 +153,7 @@ def main():
             if st.checkbox("Click to select method and rotation"):
                 rotation_options = ["None", "Varimax", "Promax", "Quartimax", "Oblimin"]
                 rotation = st.selectbox("Select rotation:", rotation_options)
-                method_options = ["Principal", "Minres", "ML", "GLS", "OLS"]
+                method_options = ["Principal", "Minres", "ML"]
                 method = st.selectbox("Select method:", method_options)
                 if rotation == "None":
                     rotation = None
