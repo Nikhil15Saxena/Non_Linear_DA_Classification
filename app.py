@@ -80,19 +80,18 @@ def main():
         filter_columns = st.multiselect("Select columns to filter:", df.columns)
         filters = {}
         for col in filter_columns:
+            unique_values = df[col].unique()
             if pd.api.types.is_numeric_dtype(df[col]):
-                min_val, max_val = float(df[col].min()), float(df[col].max())
-                filters[col] = st.slider(f"Select range for '{col}':", min_value=min_val, max_value=max_val, value=(min_val, max_val))
+                selected_values = st.multiselect(f"Select values for '{col}':", unique_values)
+                filters[col] = selected_values
             else:
-                filters[col] = st.text_input(f"Enter value to filter in '{col}' column:")
+                selected_values = st.multiselect(f"Select values for '{col}':", unique_values)
+                filters[col] = selected_values
 
         filtered_df = df.copy()
-        for col, val in filters.items():
-            if pd.api.types.is_numeric_dtype(df[col]):
-                filtered_df = filtered_df[(filtered_df[col] >= val[0]) & (filtered_df[col] <= val[1])]
-            else:
-                if val:
-                    filtered_df = filtered_df[filtered_df[col] == val]
+        for col, selected_values in filters.items():
+            if selected_values:
+                filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
 
         st.write("Filtered Data:")
         st.write(filtered_df)
