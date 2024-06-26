@@ -217,38 +217,38 @@ def main():
                 if model_selection == 'RandomForest':
                     manual_params['max_depth'] = st.number_input("max_depth", min_value=1, max_value=20, value=3)
                     manual_params['max_features'] = st.number_input("max_features", min_value=1, max_value=X.shape[1], value=3)
-                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=100, max_value=1000, step=100, value=500)
+                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=100, max_value=2000, step=100, value=500)
                 elif model_selection == 'GBM':
                     manual_params['learning_rate'] = st.number_input("learning_rate", min_value=0.01, max_value=1.0, step=0.01, value=0.1)
-                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=50, max_value=500, step=50, value=100)
+                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=50, max_value=1000, step=50, value=100)
                     manual_params['max_depth'] = st.number_input("max_depth", min_value=1, max_value=20, value=3)
                 elif model_selection == 'XGBoost':
                     manual_params['learning_rate'] = st.number_input("learning_rate", min_value=0.01, max_value=1.0, step=0.01, value=0.1)
-                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=50, max_value=500, step=50, value=100)
+                    manual_params['n_estimators'] = st.number_input("n_estimators", min_value=50, max_value=1000, step=50, value=100)
                     manual_params['max_depth'] = st.number_input("max_depth", min_value=1, max_value=20, value=3)
             
             # GridSearchCV
             grid_search_params = st.checkbox("Use GridSearchCV for hyperparameter tuning")
             if grid_search_params:
-                st.write(f"Define GridSearchCV parameters for {model_selection}:")
+                st.write(f"Enter GridSearchCV parameters for {model_selection}:")
                 param_grid = {}
                 if model_selection == 'RandomForest':
                     param_grid = {
-                        'max_depth': st.multiselect("max_depth", [2, 3, 5, 10, 15], default=[3]),
+                        'max_depth': st.multiselect("max_depth", [2, 3, 4, 5, 6, 7, 8, 9, 10, 11], default=[3]),
                         'max_features': st.multiselect("max_features", list(range(1, X.shape[1] + 1)), default=[3]),
-                        'n_estimators': st.multiselect("n_estimators", [100, 200, 500], default=[500])
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 500, 1000, 1500, 2000], default=[500])
                     }
                 elif model_selection == 'GBM':
                     param_grid = {
-                        'learning_rate': st.multiselect("learning_rate", [0.01, 0.1, 0.2], default=[0.1]),
-                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300], default=[100]),
-                        'max_depth': st.multiselect("max_depth", [3, 5, 7], default=[3])
+                        'learning_rate': st.multiselect("learning_rate", [0.01, 0.1, 0.2, 0.3, 0.4], default=[0.1]),
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300, 400, 500, 600], default=[100]),
+                        'max_depth': st.multiselect("max_depth", [3, 4, 5, 6, 7, 8, 9], default=[3])
                     }
                 elif model_selection == 'XGBoost':
                     param_grid = {
                         'learning_rate': st.multiselect("learning_rate", [0.01, 0.1, 0.2], default=[0.1]),
-                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300], default=[100]),
-                        'max_depth': st.multiselect("max_depth", [3, 5, 7], default=[3])
+                        'n_estimators': st.multiselect("n_estimators", [100, 200, 300, 400, 500, 600], default=[100]),
+                        'max_depth': st.multiselect("max_depth", [3, 4, 5, 6, 7, 8, 9], default=[3])
                     }
             
                 st.write(f"Running GridSearchCV for {model_selection}...")
@@ -311,6 +311,7 @@ def main():
             if st.button("Show Trees"):
                 if model_selection == 'RandomForest':
                     # Select one of the trees to display
+                    st.write("Displaying a single tree from the RandomForest ensemble:")
                     estimator = model.estimators_[0]
                     dot_data = StringIO()
                     export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
@@ -320,6 +321,7 @@ def main():
             
                 elif model_selection == 'GBM':
                     # Select one of the trees to display
+                    st.write("Displaying a single tree from the GBM ensemble:")
                     estimator = model.estimators_[0, 0]
                     dot_data = StringIO()
                     export_graphviz(estimator, out_file=dot_data, filled=True, rounded=True,
@@ -329,8 +331,8 @@ def main():
             
                 elif model_selection == 'XGBoost':
                     # Select one of the trees to display
+                    st.write("Displaying a single tree from the XGBoost ensemble:")
                     booster = model.get_booster()
-                    trees = booster.get_dump()
                     dot_data = xgb.to_graphviz(booster, num_trees=0)
                     st.graphviz_chart(dot_data.source)
 
